@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Biodigestor Porcino</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-dark: #0F6E56;
+    --green-mid: #1D9E75;
+    --green-light: #5DCAA5;
+    --green-pale: #E1F5EE;
+    --blue: #378ADD;
+    --blue-pale: #E6F1FB;
+    --amber: #EF9F27;
+    --red: #E24B4A;
+    --gray-1: #F7F6F2;
+    --gray-2: #ECEAE3;
+    --gray-3: #B4B2A9;
+    --gray-4: #5F5E5A;
+    --gray-5: #2C2C2A;
+    --text-main: #1A1A18;
+    --text-muted: #5F5E5A;
+    --text-hint: #888780;
+    --border: rgba(0,0,0,0.09);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--gray-1);
+    color: var(--text-main);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .shell { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--green-dark);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-logo {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar-logo .logo-mark {
+    width: 32px; height: 32px;
+    background: var(--green-light);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 8px;
+  }
+  .sidebar-logo .logo-mark svg { width: 18px; height: 18px; }
+  .sidebar-logo h2 { font-size: 12px; font-weight: 600; color: #fff; line-height: 1.3; }
+  .sidebar-logo p { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .sidebar-nav { padding: 12px 0; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px;
+    font-size: 12px; font-weight: 400;
+    color: rgba(255,255,255,0.6);
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+    user-select: none;
+  }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.07); }
+  .nav-item.active { color: #fff; background: rgba(255,255,255,0.12); border-left-color: var(--green-light); font-weight: 500; }
+  .nav-item .icon { width: 16px; height: 16px; opacity: 0.8; flex-shrink: 0; }
+  .sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 10px; color: rgba(255,255,255,0.35);
+    line-height: 1.4;
+  }
+
+  /* ── Main ── */
+  .main { flex: 1; overflow: auto; display: flex; flex-direction: column; }
+  .topbar {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 14px; font-weight: 500; color: var(--text-main); }
+  .topbar-meta { font-size: 11px; color: var(--text-hint); }
+  .badge-live {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--green-pale); color: var(--green-dark);
+    font-size: 11px; font-weight: 500; padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge-live::before {
+    content: ''; width: 6px; height: 6px;
+    background: var(--green-mid); border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .content { padding: 20px 24px; flex: 1; }
+
+  /* ── Sections ── */
+  .section { display: none; animation: fadeIn .2s ease; }
+  .section.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+  .sec-header { margin-bottom: 16px; }
+  .sec-header h2 { font-size: 16px; font-weight: 500; color: var(--text-main); }
+  .sec-header p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── KPI cards ── */
+  .kpi-row { display: grid; gap: 10px; margin-bottom: 16px; }
+  .kpi-row-4 { grid-template-columns: repeat(4,1fr); }
+  .kpi-row-3 { grid-template-columns: repeat(3,1fr); }
+  .kpi-row-2 { grid-template-columns: repeat(2,1fr); }
+  .kpi-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .kpi-card.accent { background: var(--green-dark); border-color: var(--green-dark); }
+  .kpi-card.accent .kpi-label { color: rgba(255,255,255,0.6); }
+  .kpi-card.accent .kpi-val { color: #fff; }
+  .kpi-card.accent .kpi-unit { color: rgba(255,255,255,0.5); }
+  .kpi-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+  .kpi-val { font-size: 22px; font-weight: 500; color: var(--text-main); line-height: 1.1; }
+  .kpi-unit { font-size: 11px; color: var(--text-hint); font-weight: 400; }
+  .kpi-delta { font-size: 11px; margin-top: 5px; display: flex; align-items: center; gap: 3px; }
+  .up { color: #0F6E56; }
+  .dn { color: #A32D2D; }
+  .delta-arrow { font-size: 10px; }
+
+  /* ── Chart cards ── */
+  .chart-grid { display: grid; gap: 12px; margin-bottom: 12px; }
+  .chart-grid-2 { grid-template-columns: 1fr 1fr; }
+  .chart-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .chart-grid-65 { grid-template-columns: 1.6fr 1fr; }
+  .chart-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .chart-card-title {
+    font-size: 11px; font-weight: 500; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .05em;
+    margin-bottom: 10px;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+  .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .leg-sq { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── Bar rows ── */
+  .bar-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; }
+  .bar-lbl { font-size: 11px; color: var(--text-muted); width: 130px; flex-shrink: 0; text-align: right; }
+  .bar-track { flex: 1; height: 8px; background: var(--gray-2); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .bar-num { font-size: 11px; font-weight: 500; color: var(--text-main); min-width: 56px; }
+
+  /* ── Oportunidades ── */
+  .filter-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .f-btn {
+    font-size: 11px; padding: 4px 11px;
+    border: 1px solid var(--border);
+    border-radius: 999px; background: #fff;
+    color: var(--text-muted); cursor: pointer;
+    transition: all .12s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .f-btn:hover { border-color: var(--gray-3); color: var(--text-main); }
+  .f-btn.sel { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+  .opp-list { display: flex; flex-direction: column; }
+  .opp-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .opp-row:last-child { border-bottom: none; }
+  .opp-body { flex: 1; }
+  .opp-title { font-size: 12px; font-weight: 500; color: var(--text-main); }
+  .opp-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 500;
+    padding: 3px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
+    font-family: 'DM Mono', monospace; letter-spacing: .02em;
+  }
+  .b-alta { background: #FCEBEB; color: #791F1F; }
+  .b-media { background: #FAEEDA; color: #633806; }
+  .b-baja { background: #EAF3DE; color: #27500A; }
+
+  /* ── Normativas ── */
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    background: var(--blue-pale); color: #0C447C;
+    font-size: 10px; font-weight: 500;
+    padding: 4px 9px; border-radius: var(--radius-sm);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .01em;
+  }
+
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+          <path d="M12 2C8 2 4 6 4 10c0 5 8 12 8 12s8-7 8-12c0-4-4-8-8-8z"/>
+          <circle cx="12" cy="10" r="3" fill="rgba(255,255,255,0.3)" stroke="#fff"/>
+        </svg>
+      </div>
+      <h2>Biodigestor<br>Porcino</h2>
+      <p>Granja Santa Marianita</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="go(0,this)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        Resumen ejecutivo
+      </div>
+      <div class="nav-item" onclick="go(1,this)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M4 6l4-4 4 4"/><circle cx="8" cy="13" r="1.5" fill="currentColor" stroke="none"/></svg>
+        Gestión de residuos
+      </div>
+      <div class="nav-item" onclick="go(2,this)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12 L5 8 L8 10 L11 5 L14 7"/><path d="M14 4v3h-3"/></svg>
+        Eficiencia recursos
+      </div>
+      <div class="nav-item" onclick="go(3,this)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+        Beneficios económicos
+      </div>
+      <div class="nav-item" onclick="go(4,this)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13 Q8 3 13 13"/><path d="M5 10 h6"/></svg>
+        Impacto ambiental
+      </div>
+      <div class="nav-item" onclick="go(5,this)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
+        Oportunidades mejora
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      Modelo híbrido RF + Monte Carlo + IoT<br>
+      65 cabezas · Clima tropical · 2024
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <h1 id="topTitle">Resumen ejecutivo — Economía circular porcina</h1>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="topbar-meta">Actualizado: Abr 2024</span>
+        <span class="badge-live">En línea</span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ═══ S1: RESUMEN EJECUTIVO ═══ -->
+      <div class="section active" id="sec0">
+        <div class="sec-header">
+          <h2>Indicadores clave de desempeño</h2>
+          <p>Implementación de biodigestor anaeróbico — visión anual 2024</p>
+        </div>
+        <div class="kpi-row kpi-row-4">
+          <div class="kpi-card accent">
+            <div class="kpi-label">Reducción de residuos</div>
+            <div class="kpi-val">219.5 <span class="kpi-unit">ton/año</span></div>
+            <div class="kpi-delta"><span class="delta-arrow">▲</span><span style="color:var(--green-light)">+18% vs año anterior</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Eficiencia de recursos</div>
+            <div class="kpi-val">83.4 <span class="kpi-unit">%</span></div>
+            <div class="kpi-delta up"><span class="delta-arrow">▲</span> +11.2 pp vs base</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Beneficios económicos</div>
+            <div class="kpi-val">$548K <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-delta up"><span class="delta-arrow">▲</span> VPN promedio · 99.5% viable</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Reducción GEI</div>
+            <div class="kpi-val">47.3 <span class="kpi-unit">tCO₂eq</span></div>
+            <div class="kpi-delta up"><span class="delta-arrow">▲</span> +22% vs línea base</div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Evolución de KPIs en el tiempo — 2024</div>
+          <div class="legend">
+            <div class="leg"><div class="leg-sq" style="background:#1D9E75"></div>Reducción residuos (ton)</div>
+            <div class="leg"><div class="leg-sq" style="background:#378ADD;border-radius:0"></div>Eficiencia recursos (%)</div>
+            <div class="leg"><div class="leg-sq" style="background:#EF9F27;clip-path:polygon(50% 0%,100% 100%,0% 100%)"></div>Reducción GEI (tCO₂eq)</div>
+          </div>
+          <div style="position:relative;height:260px"><canvas id="c_kpi" role="img" aria-label="Evolución mensual de KPIs en 2024">Líneas mostrando crecimiento de residuos gestionados, eficiencia y reducción de GEI a lo largo del año.</canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══ S2: GESTIÓN DE RESIDUOS ═══ -->
+      <div class="section" id="sec1">
+        <div class="sec-header">
+          <h2>Gestión de residuos</h2>
+          <p>Flujo, tipología y destino de residuos del sistema porcino</p>
+        </div>
+        <div class="kpi-row kpi-row-3">
+          <div class="kpi-card accent">
+            <div class="kpi-label">Eficiencia gestión residuos</div>
+            <div class="kpi-val">91.2 <span class="kpi-unit">%</span></div>
+            <div class="kpi-delta"><span style="color:var(--green-light)">▲ meta: 90%  ✓ cumplida</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Total residuos gestionados</div>
+            <div class="kpi-val">219.5 <span class="kpi-unit">ton/día</span></div>
+            <div class="kpi-delta up">▲ 65 cabezas · ciclo 33 días</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Residuos valorizados</div>
+            <div class="kpi-val">200.2 <span class="kpi-unit">ton/día</span></div>
+            <div class="kpi-delta up">▲ 91.2% del total</div>
+          </div>
+        </div>
+        <div class="chart-grid chart-grid-2">
+          <div class="chart-card">
+            <div class="chart-card-title">Tipos de residuos generados</div>
+            <div class="legend">
+              <div class="leg"><div class="leg-sq" style="background:#1D9E75"></div>Estiércol 68%</div>
+              <div class="leg"><div class="leg-sq" style="background:#378ADD"></div>Aguas residuales 22%</div>
+              <div class="leg"><div class="leg-sq" style="background:#EF9F27"></div>Alimentos 7%</div>
+              <div class="leg"><div class="leg-sq" style="background:#D4537E"></div>Otros 3%</div>
+            </div>
+            <div style="position:relative;height:200px"><canvas id="c_tipos" role="img" aria-label="Distribución de residuos por tipo">Estiércol 68%, Aguas residuales 22%, Alimentos 7%, Otros 3%</canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Destino de los residuos</div>
+            <div class="legend">
+              <div class="leg"><div class="leg-sq" style="background:#3B6D11"></div>Biofertilizante 58%</div>
+              <div class="leg"><div class="leg-sq" style="background:#5DCAA5"></div>Biogás 33%</div>
+              <div class="leg"><div class="leg-sq" style="background:#B4B2A9"></div>Eliminación 9%</div>
+            </div>
+            <div style="position:relative;height:200px"><canvas id="c_destino" role="img" aria-label="Destino de residuos generados">Biofertilizante 58%, Biogás 33%, Eliminación 9%</canvas></div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Cantidad por tipo de residuo — período actual</div>
+          <div class="bar-list">
+            <div class="bar-row"><span class="bar-lbl">Estiércol</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:#1D9E75"></div></div><span class="bar-num">149.2 ton</span></div>
+            <div class="bar-row"><span class="bar-lbl">Aguas residuales</span><div class="bar-track"><div class="bar-fill" style="width:46%;background:#378ADD"></div></div><span class="bar-num">48.3 ton</span></div>
+            <div class="bar-row"><span class="bar-lbl">Residuos de alimento</span><div class="bar-track"><div class="bar-fill" style="width:15%;background:#EF9F27"></div></div><span class="bar-num">15.4 ton</span></div>
+            <div class="bar-row"><span class="bar-lbl">Otros</span><div class="bar-track"><div class="bar-fill" style="width:7%;background:#D4537E"></div></div><span class="bar-num">6.6 ton</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ S3: EFICIENCIA ═══ -->
+      <div class="section" id="sec2">
+        <div class="sec-header">
+          <h2>Eficiencia en el uso de los recursos</h2>
+          <p>Agua, energía y alimentos — consumo y aprovechamiento</p>
+        </div>
+        <div class="kpi-row kpi-row-3">
+          <div class="kpi-card accent">
+            <div class="kpi-label">Eficiencia global recursos</div>
+            <div class="kpi-val">83.4 <span class="kpi-unit">%</span></div>
+            <div class="kpi-delta"><span style="color:var(--green-light)">▲ +11.2 pp vs año anterior</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Agua reutilizada/día</div>
+            <div class="kpi-val">874.5 <span class="kpi-unit">L/día</span></div>
+            <div class="kpi-delta up">▲ 78% del consumo total</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Biogás recuperado (ciclo)</div>
+            <div class="kpi-val">9.57 <span class="kpi-unit">m³</span></div>
+            <div class="kpi-delta up">▲ 0.29 m³/día · 33 días</div>
+          </div>
+        </div>
+        <div class="chart-card" style="margin-bottom:12px">
+          <div class="chart-card-title">Consumo de recursos en el tiempo — 2024</div>
+          <div class="legend">
+            <div class="leg"><div class="leg-sq" style="background:#378ADD"></div>Agua (m³)</div>
+            <div class="leg"><div class="leg-sq" style="background:#EF9F27;border-radius:0"></div>Alimentos (ton)</div>
+            <div class="leg"><div class="leg-sq" style="background:#1D9E75"></div>Biogás producido (m³)</div>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="c_recursos" role="img" aria-label="Consumo de recursos por mes en 2024">Agua, alimentos y biogás a lo largo del año 2024.</canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Oportunidades de mejora en eficiencia</div>
+          <div class="opp-list">
+            <div class="opp-row"><div class="opp-body"><div class="opp-title">Optimizar relación agua:estiércol (1:3 → 1:4)</div><div class="opp-sub">Impacto estimado: +8% producción biogás/día</div></div><span class="badge b-alta">Alta</span></div>
+            <div class="opp-row"><div class="opp-body"><div class="opp-title">Instalar medidores de caudal en tiempo real por módulo</div><div class="opp-sub">Impacto: reducción 15% desperdicio de agua</div></div><span class="badge b-alta">Alta</span></div>
+            <div class="opp-row"><div class="opp-body"><div class="opp-title">Recuperar calor del digestor para temporada fría</div><div class="opp-sub">Impacto: +12% eficiencia digestión anaeróbica</div></div><span class="badge b-media">Media</span></div>
+            <div class="opp-row"><div class="opp-body"><div class="opp-title">Pre-cocción de residuos de alimento antes de mezcla</div><div class="opp-sub">Impacto: mejor tasa de conversión de STV</div></div><span class="badge b-media">Media</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ S4: BENEFICIOS ECONÓMICOS ═══ -->
+      <div class="section" id="sec3">
+        <div class="sec-header">
+          <h2>Beneficios económicos</h2>
+          <p>Ingresos, costos reducidos y análisis de viabilidad Monte Carlo</p>
+        </div>
+        <div class="kpi-row kpi-row-3">
+          <div class="kpi-card accent">
+            <div class="kpi-label">Beneficios netos (VPN prom.)</div>
+            <div class="kpi-val">$548K <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-delta"><span style="color:var(--green-light)">▲ 99.5% escenarios viables</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Ingreso anual estimado</div>
+            <div class="kpi-val">$72K <span class="kpi-unit">MXN/año</span></div>
+            <div class="kpi-delta up">▲ Biogás + Biofertilizante</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">OPEX anual</div>
+            <div class="kpi-val">$12K <span class="kpi-unit">MXN/año</span></div>
+            <div class="kpi-delta dn">▼ Reducción vs manejo conv.</div>
+          </div>
+        </div>
+        <div class="chart-grid chart-grid-2">
+          <div class="chart-card">
+            <div class="chart-card-title">Ingresos por producto — mensual 2024</div>
+            <div class="legend">
+              <div class="leg"><div class="leg-sq" style="background:#1D9E75"></div>Biofertilizante</div>
+              <div class="leg"><div class="leg-sq" style="background:#378ADD;border-radius:0"></div>Biogás (sustitución LP)</div>
+            </div>
+            <div style="position:relative;height:210px"><canvas id="c_ingresos" role="img" aria-label="Ingresos mensuales por biofertilizante y biogás">Ingresos acumulados por mes en 2024.</canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Costos reducidos por economía circular</div>
+            <div class="legend">
+              <div class="leg"><div class="leg-sq" style="background:#EF9F27"></div>Fertilizantes evitados</div>
+              <div class="leg"><div class="leg-sq" style="background:#D4537E"></div>Gas LP evitado</div>
+              <div class="leg"><div class="leg-sq" style="background:#B4B2A9;border-radius:0"></div>Disposición residuos</div>
+            </div>
+            <div style="position:relative;height:210px"><canvas id="c_costos" role="img" aria-label="Costos reducidos por categoría">Fertilizantes $28K, Gas LP $15K, Disposición $9K MXN.</canvas></div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Distribución VPN — Monte Carlo (1,000 escenarios)</div>
+          <div class="legend">
+            <div class="leg"><div class="leg-sq" style="background:#378ADD"></div>Viable (99.5%)</div>
+            <div class="leg"><div class="leg-sq" style="background:#E24B4A;border-radius:0"></div>No viable (0.5%)</div>
+          </div>
+          <div style="position:relative;height:170px"><canvas id="c_vpn" role="img" aria-label="Distribución VPN Monte Carlo">99.5% de escenarios con VPN positivo.</canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══ S5: IMPACTO AMBIENTAL ═══ -->
+      <div class="section" id="sec4">
+        <div class="sec-header">
+          <h2>Impacto ambiental</h2>
+          <p>Emisiones GEI, uso de recursos naturales y biodiversidad</p>
+        </div>
+        <div class="kpi-row kpi-row-3">
+          <div class="kpi-card accent">
+            <div class="kpi-label">Reducción GEI</div>
+            <div class="kpi-val">47.3 <span class="kpi-unit">tCO₂eq/año</span></div>
+            <div class="kpi-delta"><span style="color:var(--green-light)">▲ 22% vs línea base</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Agua recuperada</div>
+            <div class="kpi-val">874.5 <span class="kpi-unit">L/día</span></div>
+            <div class="kpi-delta up">▲ 78% del total consumido</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Impacto en biodiversidad</div>
+            <div class="kpi-val">+12 <span class="kpi-unit">%</span></div>
+            <div class="kpi-delta up">▲ mejora área buffer</div>
+          </div>
+        </div>
+        <div class="chart-card" style="margin-bottom:12px">
+          <div class="chart-card-title">Emisiones GEI en el tiempo — con vs sin biodigestor (tCO₂eq)</div>
+          <div class="legend">
+            <div class="leg"><div class="leg-sq" style="background:#E24B4A;border-radius:0"></div>Sin biodigestor (línea base)</div>
+            <div class="leg"><div class="leg-sq" style="background:#1D9E75"></div>Con biodigestor</div>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="c_gei" role="img" aria-label="Comparativo de emisiones GEI por mes">Reducción progresiva de emisiones gracias al biodigestor 2024.</canvas></div>
+        </div>
+        <div class="chart-grid chart-grid-2">
+          <div class="chart-card">
+            <div class="chart-card-title">Uso de recursos naturales</div>
+            <div class="bar-list">
+              <div class="bar-row"><span class="bar-lbl">Agua total</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:#378ADD"></div></div><span class="bar-num">1,120 L/d</span></div>
+              <div class="bar-row"><span class="bar-lbl">Agua reutilizada</span><div class="bar-track"><div class="bar-fill" style="width:78%;background:#1D9E75"></div></div><span class="bar-num">874.5 L/d</span></div>
+              <div class="bar-row"><span class="bar-lbl">Biogás recuperado</span><div class="bar-track"><div class="bar-fill" style="width:58%;background:#EF9F27"></div></div><span class="bar-num">0.29 m³/d</span></div>
+              <div class="bar-row"><span class="bar-lbl">Biofertilizante</span><div class="bar-track"><div class="bar-fill" style="width:65%;background:#5DCAA5"></div></div><span class="bar-num">0.73 m³/d</span></div>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Normativas ambientales aplicables</div>
+            <p style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Marco regulatorio cumplido por el proyecto:</p>
+            <div class="chip-wrap">
+              <span class="chip">NOM-004-SEMARNAT-2002</span>
+              <span class="chip">NOM-001-SEMARNAT-1996</span>
+              <span class="chip">NOM-052-SEMARNAT-2005</span>
+              <span class="chip">Acuerdo de París — Art. 4</span>
+              <span class="chip">Ley Gral. Cambio Climático</span>
+              <span class="chip">NOM-067-SEMARNAT</span>
+              <span class="chip">Ley Ambiental CDMX</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ S6: OPORTUNIDADES ═══ -->
+      <div class="section" id="sec5">
+        <div class="sec-header">
+          <h2>Oportunidades de mejora</h2>
+          <p>Priorización de acciones para maximizar eficiencia y reducción de impacto</p>
+        </div>
+        <div class="kpi-row kpi-row-3">
+          <div class="kpi-card accent">
+            <div class="kpi-label">Oportunidades identificadas</div>
+            <div class="kpi-val">12 <span class="kpi-unit">total</span></div>
+            <div class="kpi-delta"><span style="color:var(--green-light)">4 alta · 4 media · 4 baja</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Impacto económico potencial</div>
+            <div class="kpi-val">+$38K <span class="kpi-unit">MXN/año</span></div>
+            <div class="kpi-delta up">▲ si se implementan todas</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Reducción GEI adicional</div>
+            <div class="kpi-val">+12.4 <span class="kpi-unit">tCO₂eq</span></div>
+            <div class="kpi-delta up">▲ con mejoras de alta prioridad</div>
+          </div>
+        </div>
+        <div class="filter-row" id="frow">
+          <button class="f-btn sel" onclick="filtrar('all',this)">Todas (12)</button>
+          <button class="f-btn" onclick="filtrar('alta',this)">Prioridad alta (4)</button>
+          <button class="f-btn" onclick="filtrar('media',this)">Prioridad media (4)</button>
+          <button class="f-btn" onclick="filtrar('baja',this)">Prioridad baja (4)</button>
+        </div>
+        <div class="chart-card" style="margin-bottom:12px">
+          <div class="opp-list" id="oppList">
+            <div class="opp-row" data-p="alta"><div class="opp-body"><div class="opp-title">Ampliar volumen del biodigestor para hato de 80 cabezas (+23%)</div><div class="opp-sub">Área: Infraestructura · Impacto: +$15K MXN/año ingreso adicional</div></div><span class="badge b-alta">Alta</span></div>
+            <div class="opp-row" data-p="alta"><div class="opp-body"><div class="opp-title">Implementar sensores IoT de temperatura y pH con alertas automáticas</div><div class="opp-sub">Área: Monitoreo · Impacto: reducción 16.9% anomalías operativas</div></div><span class="badge b-alta">Alta</span></div>
+            <div class="opp-row" data-p="alta"><div class="opp-body"><div class="opp-title">Optimizar relación agua:estiércol en alimentación (1:3 → 1:4)</div><div class="opp-sub">Área: Producción biogás · Impacto: +8% biogás/día</div></div><span class="badge b-alta">Alta</span></div>
+            <div class="opp-row" data-p="alta"><div class="opp-body"><div class="opp-title">Capacitar operadores en variables críticas del proceso anaeróbico</div><div class="opp-sub">Área: Capital humano · Impacto: reducción errores operativos 30%</div></div><span class="badge b-alta">Alta</span></div>
+            <div class="opp-row" data-p="media"><div class="opp-body"><div class="opp-title">Recuperar calor del digestor para temporada fría</div><div class="opp-sub">Área: Energía · Impacto: +12% eficiencia digestión anaeróbica</div></div><span class="badge b-media">Media</span></div>
+            <div class="opp-row" data-p="media"><div class="opp-body"><div class="opp-title">Certificar biofertilizante para mercados orgánicos locales</div><div class="opp-sub">Área: Comercialización · Impacto: +40% precio unitario</div></div><span class="badge b-media">Media</span></div>
+            <div class="opp-row" data-p="media"><div class="opp-body"><div class="opp-title">Integrar compostaje complementario para sólidos residuales</div><div class="opp-sub">Área: Residuos · Impacto: valorizar 100% fracción sólida</div></div><span class="badge b-media">Media</span></div>
+            <div class="opp-row" data-p="media"><div class="opp-body"><div class="opp-title">Pre-cocción de residuos de alimento antes de mezcla al digestor</div><div class="opp-sub">Área: Proceso · Impacto: mejor tasa de conversión de STV</div></div><span class="badge b-media">Media</span></div>
+            <div class="opp-row" data-p="baja"><div class="opp-body"><div class="opp-title">Instalar paneles solares para autoconsumo eléctrico de bombas</div><div class="opp-sub">Área: Energía · Impacto: ahorro $8K MXN/año electricidad</div></div><span class="badge b-baja">Baja</span></div>
+            <div class="opp-row" data-p="baja"><div class="opp-body"><div class="opp-title">Registrar proyecto ante Bonos de Carbono VERRA</div><div class="opp-sub">Área: Financiero · Impacto: ingresos GEI ~$6K MXN/año</div></div><span class="badge b-baja">Baja</span></div>
+            <div class="opp-row" data-p="baja"><div class="opp-body"><div class="opp-title">Conectar dashboard a plataforma web pública (transparencia)</div><div class="opp-sub">Área: Gobernanza · Impacto: trazabilidad y difusión académica</div></div><span class="badge b-baja">Baja</span></div>
+            <div class="opp-row" data-p="baja"><div class="opp-body"><div class="opp-title">Documentar protocolo de mantenimiento semestral del digestor</div><div class="opp-sub">Área: Mantenimiento · Impacto: vida útil estimada +5 años</div></div><span class="badge b-baja">Baja</span></div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Priorización por impacto económico estimado (MXN/año)</div>
+          <div style="position:relative;height:220px"><canvas id="c_opp" role="img" aria-label="Impacto económico por oportunidad de mejora">Comparativo de impacto de las principales oportunidades identificadas.</canvas></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div>
+
+<script>
+const titles = [
+  'Resumen ejecutivo — Economía circular porcina',
+  'Gestión de residuos — Tipos y destino',
+  'Eficiencia en el uso de los recursos',
+  'Beneficios económicos — VPN y rentabilidad',
+  'Impacto ambiental — GEI y biodiversidad',
+  'Oportunidades de mejora — Priorización'
+];
+function go(idx, el) {
+  document.querySelectorAll('.section').forEach((s,i) => s.classList.toggle('active', i===idx));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('topTitle').textContent = titles[idx];
+}
+function filtrar(p, el) {
+  document.querySelectorAll('#frow .f-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  document.querySelectorAll('#oppList .opp-row').forEach(r => {
+    r.style.display = (p==='all' || r.dataset.p===p) ? 'flex' : 'none';
+  });
+}
+
+const M = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const TC = 'rgba(0,0,0,0.4)';
+const GC = 'rgba(0,0,0,0.06)';
+const def = {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+  scales:{x:{grid:{color:GC},ticks:{color:TC,font:{size:10}}},y:{grid:{color:GC},ticks:{color:TC,font:{size:10}}}}};
+
+new Chart(document.getElementById('c_kpi'),{type:'line',
+  data:{labels:M,datasets:[
+    {data:[180,185,192,195,200,205,210,212,215,217,219,220],borderColor:'#1D9E75',backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:'#1D9E75'},
+    {data:[72,74,76,77,79,80,81,82,82,83,83,84],borderColor:'#378ADD',backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:'#378ADD',borderDash:[6,3]},
+    {data:[30,32,35,36,38,40,41,43,44,45,46,47],borderColor:'#EF9F27',backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:'#EF9F27',borderDash:[2,3]}
+  ]},options:def});
+
+new Chart(document.getElementById('c_tipos'),{type:'doughnut',
+  data:{labels:['Estiércol','Aguas residuales','Res. alimento','Otros'],
+    datasets:[{data:[149.2,48.3,15.4,6.6],backgroundColor:['#1D9E75','#378ADD','#EF9F27','#D4537E'],borderWidth:0,hoverOffset:6}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{display:false}}}});
+
+new Chart(document.getElementById('c_destino'),{type:'doughnut',
+  data:{labels:['Biofertilizante','Biogás','Eliminación'],
+    datasets:[{data:[58,33,9],backgroundColor:['#3B6D11','#5DCAA5','#B4B2A9'],borderWidth:0,hoverOffset:6}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{display:false}}}});
+
+new Chart(document.getElementById('c_recursos'),{type:'line',
+  data:{labels:M,datasets:[
+    {data:[1.05,1.05,1.08,1.10,1.08,1.12,1.10,1.09,1.11,1.12,1.10,1.12],borderColor:'#378ADD',backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:3,pointBackgroundColor:'#378ADD'},
+    {data:[0.82,0.83,0.85,0.86,0.84,0.87,0.86,0.85,0.87,0.88,0.87,0.88],borderColor:'#EF9F27',backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:3,pointBackgroundColor:'#EF9F27',borderDash:[5,3]},
+    {data:[0.22,0.23,0.25,0.26,0.26,0.28,0.28,0.28,0.29,0.29,0.29,0.29],borderColor:'#1D9E75',backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:3,pointBackgroundColor:'#1D9E75',borderDash:[2,2]}
+  ]},options:def});
+
+new Chart(document.getElementById('c_ingresos'),{type:'bar',
+  data:{labels:M,datasets:[
+    {label:'Biofertilizante',data:[3800,3900,4100,4200,4100,4400,4300,4200,4400,4500,4400,4600],backgroundColor:'#1D9E75',borderRadius:3},
+    {label:'Biogás',data:[1400,1500,1600,1700,1600,1800,1700,1700,1800,1900,1800,1900],backgroundColor:'#378ADD',borderRadius:3}
+  ]},
+  options:{...def,scales:{x:{...def.scales.x,stacked:true},y:{...def.scales.y,stacked:true,ticks:{...def.scales.y.ticks,callback:v=>'$'+v.toLocaleString()}}}}});
+
+new Chart(document.getElementById('c_costos'),{type:'bar',
+  data:{labels:['Fertilizantes evitados','Gas LP evitado','Disposición residuos'],
+    datasets:[{data:[28000,15000,9000],backgroundColor:['#EF9F27','#D4537E','#B4B2A9'],borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:GC},ticks:{color:TC,font:{size:10},callback:v=>'$'+v.toLocaleString()}},
+            y:{grid:{display:false},ticks:{color:TC,font:{size:10}}}}}});
+
+new Chart(document.getElementById('c_vpn'),{type:'bar',
+  data:{labels:['< 0','0–200k','200k–400k','400k–700k','700k–1M','> 1M'],
+    datasets:[
+      {label:'No viable',data:[5,0,0,0,0,0],backgroundColor:'#E24B4A',borderRadius:3},
+      {label:'Viable',data:[0,65,220,380,220,110],backgroundColor:'#378ADD',borderRadius:3}
+    ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{stacked:true,grid:{display:false},ticks:{color:TC,font:{size:10}}},
+            y:{stacked:true,grid:{color:GC},ticks:{color:TC,font:{size:10}}}}}});
+
+new Chart(document.getElementById('c_gei'),{type:'line',
+  data:{labels:M,datasets:[
+    {data:[62,62,62,62,62,62,62,62,62,62,62,62],borderColor:'#E24B4A',backgroundColor:'transparent',tension:0,borderWidth:2,pointRadius:0,borderDash:[6,3]},
+    {data:[58,56,54,52,51,50,49,48,48,47,47,47],borderColor:'#1D9E75',backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:3,pointBackgroundColor:'#1D9E75'}
+  ]},options:def});
+
+new Chart(document.getElementById('c_opp'),{type:'bar',
+  data:{labels:['Ampliar volumen','Certif. biofertilizante','Sensores IoT','Ratio agua:estiércol','Paneles solares','Bonos carbono'],
+    datasets:[{data:[15000,12000,8000,6000,4000,3000],
+      backgroundColor:['#791F1F','#A32D2D','#A32D2D','#A32D2D','#27500A','#27500A'],borderRadius:4}]},
+  options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:GC},ticks:{color:TC,font:{size:10},callback:v=>'$'+v.toLocaleString()}},
+            y:{grid:{display:false},ticks:{color:TC,font:{size:10}}}}}});
+</script>
+</body>
+</html>
